@@ -1,0 +1,9 @@
+Graph aléatoire :
+- Pondérer les arrêtes
+- Codé algo trouve la solution et comparé les temps Dijkstra’s
+- Chercher des méthodes pour amélioré la rapidité
+- Chercher d'autre features ( forcé un nœud à prendre, un nœud avant un autre)
+
+Différence entre notre code et le papier:
+
+ 
