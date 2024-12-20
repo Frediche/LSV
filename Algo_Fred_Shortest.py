@@ -97,4 +97,3 @@ if path:
     print(" -> ".join(map(str, path)))
 else:
     print("\nNo path found.")
-
