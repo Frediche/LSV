@@ -3,7 +3,9 @@ Graph aléatoire :
 - Codé algo trouve la solution et comparé les temps Dijkstra’s
 - Chercher des méthodes pour amélioré la rapidité
 - Chercher d'autre features ( forcé un nœud à prendre, un nœud avant un autre)
+- Afficher les nœuds pour un petit nombre pour la présentation 
 
-Différence entre notre code et le papier:
 
- 
+Différence entre notre code et le papier
+
+Créer le git pour que tu vois mon code
