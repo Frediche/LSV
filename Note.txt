@@ -1,11 +1,18 @@
 Graph aléatoire :
-- Pondérer les arrêtes
-- Codé algo trouve la solution et comparé les temps Dijkstra’s
+
+
 - Chercher des méthodes pour amélioré la rapidité
+- Différence entre notre code et le papier
+
+
+- Codé algo trouve la solution et comparé les temps Dijkstra’s
+- Afficher les nœuds pour un petit nombre pour la présentation
 - Chercher d'autre features ( forcé un nœud à prendre, un nœud avant un autre)
-- Afficher les nœuds pour un petit nombre pour la présentation 
 
 
-Différence entre notre code et le papier
+Keskonfé:
+- Pondérer les arrêtes ( même pas le pareil le papier, comparé )
 
-Créer le git pour que tu vois mon code
+=> Chercher des méthodes pour amélioré la rapidité
+=> Transformer en PATH HAMILTONNIEN
+=> Cas d'utilisation d'un SAT et pas de dijkstra 

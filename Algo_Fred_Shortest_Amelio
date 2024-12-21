@@ -1,0 +1,390 @@
+import random
+import time
+from heapq import heappop, heappush
+from pysat.solvers import Glucose3
+import matplotlib.pyplot as plt
+import networkx as nx
+
+def generate_connected_graph(num_nodes):
+    """Generate a connected graph as an adjacency list."""
+    graph = {i: set() for i in range(num_nodes)}
+    edges = []
+
+    # Ensure the graph is connected by creating a spanning tree
+    nodes = list(range(num_nodes))
+    random.shuffle(nodes)
+    for i in range(num_nodes - 1):
+        u, v = nodes[i], nodes[i + 1]
+        graph[u].add(v)
+        graph[v].add(u)
+        edges.append((u, v))
+
+    # Add additional random edges
+    for _ in range(num_nodes):  # Adding a few random edges
+        u, v = random.sample(range(num_nodes), 2)
+        if v not in graph[u]:
+            graph[u].add(v)
+            graph[v].add(u)
+            edges.append((u, v))
+
+    return graph, edges
+
+def encode_cnf(graph, source, target, path_length, num_nodes, via_nodes=None):
+    """Encode the shortest path problem into CNF with a given path length."""
+    clauses = []
+    var = lambda i, j: i * path_length + j + 1  # Variables: x_i_j = node i is in position j in the path
+
+    # Each position in the path must have exactly one node
+    for j in range(path_length):
+        clauses.append([var(i, j) for i in range(num_nodes)])  # At least one
+        for i in range(num_nodes):
+            for k in range(i + 1, num_nodes):
+                clauses.append([-var(i, j), -var(k, j)])  # At most one
+
+    # Each node must appear at most once in the path
+    for i in range(num_nodes):
+        for j in range(path_length):
+            for k in range(j + 1, path_length):
+                clauses.append([-var(i, j), -var(i, k)])
+
+    # Add constraints for edges (only connected nodes can follow each other)
+    for j in range(path_length - 1):
+        for i in range(num_nodes):
+            for k in range(num_nodes):
+                if k not in graph[i]:
+                    clauses.append([-var(i, j), -var(k, j + 1)])
+
+    # Source must be the first node and target the last
+    clauses.append([var(source, 0)])
+    clauses.append([var(target, path_length - 1)])
+
+    # If via_nodes are specified, ensure they appear in the path
+    if via_nodes:
+        for via_node in via_nodes:
+            clauses.append([var(via_node, j) for j in range(1, path_length - 1)])
+
+    # # If via_nodes are specified, ensure they appear in the path in order
+    # if via_nodes:
+    #     for index, via_node in enumerate(via_nodes):
+    #         clauses.append([var(via_node, j) for j in range(1 + index, path_length - (len(via_nodes) - index))])
+
+    # # If via_nodes are specified, ensure they do NOT appear in the path
+    # if via_nodes:
+    #     for via_node in via_nodes:
+    #         for j in range(path_length):
+    #             clauses.append([-var(via_node, j)])  # Node cannot appear at any position
+
+
+    return clauses
+
+def solve_shortest_path(graph, source, target, num_nodes, via_nodes=None):
+    """Iteratively solve for the shortest path."""
+    for path_length in range(2, num_nodes + 1):
+        clauses = encode_cnf(graph, source, target, path_length, num_nodes,via_nodes=via_nodes)
+        solver = Glucose3()
+        for clause in clauses:
+            solver.add_clause(clause)
+        is_solvable = solver.solve()
+        if is_solvable:
+            model = solver.get_model()
+            path = [-1] * path_length
+            for i in range(num_nodes):
+                for j in range(path_length):
+                    if model[(i * path_length) + j] > 0:
+                        path[j] = i
+            return path
+    return None
+
+def dijkstra_shortest_path(graph, source, target):
+    """Solve the shortest path problem using Dijkstra's algorithm."""
+    start_time = time.time()
+
+    # Priority queue for Dijkstra's
+    queue = [(0, source)]  # (distance, node)
+    distances = {node: float('inf') for node in graph}
+    distances[source] = 0
+    previous_nodes = {node: None for node in graph}
+
+    while queue:
+        current_distance, current_node = heappop(queue)
+
+        if current_node == target:
+            break  # Stop when reaching the target
+
+        for neighbor in graph[current_node]:
+            distance = current_distance + 1  # All edges have weight 1
+            if distance < distances[neighbor]:
+                distances[neighbor] = distance
+                previous_nodes[neighbor] = current_node
+                heappush(queue, (distance, neighbor))
+
+    # Reconstruct the path
+    path = []
+    current = target
+    while current is not None:
+        path.append(current)
+        current = previous_nodes[current]
+    path.reverse()
+
+    end_time = time.time()
+    print(f"Dijkstra's Algorithm Time: {end_time - start_time:.4f} seconds")
+    return path if path[0] == source else None
+
+def visualize_graph_with_paths(graph, path_dijkstra, path_sat, source, target, via_nodes):
+    """Visualize the graph with paths highlighted."""
+    # Create a NetworkX graph from the adjacency list
+    G = nx.Graph()
+    for u, neighbors in graph.items():
+        for v in neighbors:
+            G.add_edge(u, v)
+
+    # Define node colors and edge colors
+    node_colors = []
+    edge_colors = []
+    edge_widths = []
+
+    # Path colors
+    color_dijkstra = "blue"
+    color_sat = "green"
+    color_overlap = "purple"  # Color for overlapping paths
+    color_via = "yellow"  # Color for via nodes
+
+    # Set node colors
+    for node in G.nodes:
+        if node == source or node == target:
+            node_colors.append("red")  # Source and target are red
+        elif node in via_nodes:
+            node_colors.append(color_via)  # Via nodes are yellow
+        elif path_dijkstra and node in path_dijkstra and path_sat and node in path_sat:
+            node_colors.append(color_overlap)
+        elif path_dijkstra and node in path_dijkstra:
+            node_colors.append(color_dijkstra)
+        elif path_sat and node in path_sat:
+            node_colors.append(color_sat)
+        else:
+            node_colors.append("gray")  # Default color
+
+    # Set edge colors and widths
+    for edge in G.edges:
+        if (
+            path_dijkstra
+            and edge[0] in path_dijkstra
+            and edge[1] in path_dijkstra
+            and abs(path_dijkstra.index(edge[0]) - path_dijkstra.index(edge[1])) == 1
+        ):
+            if (
+                path_sat
+                and edge[0] in path_sat
+                and edge[1] in path_sat
+                and abs(path_sat.index(edge[0]) - path_sat.index(edge[1])) == 1
+            ):
+                edge_colors.append(color_overlap)
+                edge_widths.append(3.0)
+            else:
+                edge_colors.append(color_dijkstra)
+                edge_widths.append(2.5)
+        elif (
+            path_sat
+            and edge[0] in path_sat
+            and edge[1] in path_sat
+            and abs(path_sat.index(edge[0]) - path_sat.index(edge[1])) == 1
+        ):
+            edge_colors.append(color_sat)
+            edge_widths.append(2.0)
+        else:
+            edge_colors.append("gray")
+            edge_widths.append(1.0)  # Default width
+
+    # Draw the graph
+    pos = nx.spring_layout(G, seed=42)  # Layout for visualization
+    plt.figure(figsize=(12, 8))
+
+    # Draw edges
+    nx.draw_networkx_edges(G, pos, edge_color=edge_colors, width=edge_widths)
+
+    # Draw nodes
+    nx.draw_networkx_nodes(G, pos, node_color=node_colors, node_size=500)
+
+    # Draw labels
+    nx.draw_networkx_labels(G, pos, font_size=10, font_color="black")
+
+    plt.title("Graph with Highlighted Paths")
+    plt.axis("off")
+    plt.show()
+
+def dijkstra_shortest_path_forbidden_nodes(graph, source, target, forbidden_nodes=None):
+    """
+    Solve the shortest path problem using Dijkstra's algorithm while avoiding forbidden nodes.
+    
+    Parameters:
+        graph (dict): Adjacency list representation of the graph.
+        source (int): Source node.
+        target (int): Target node.
+        forbidden_nodes (list): List of nodes to avoid in the path.
+
+    Returns:
+        list: The shortest path from source to target, or None if no path exists.
+    """
+    if forbidden_nodes is None:
+        forbidden_nodes = []
+
+    start_time = time.time()
+
+    # Priority queue for Dijkstra's
+    queue = [(0, source)]  # (distance, node)
+    distances = {node: float('inf') for node in graph}
+    distances[source] = 0
+    previous_nodes = {node: None for node in graph}
+
+    while queue:
+        current_distance, current_node = heappop(queue)
+
+        # Skip forbidden nodes
+        if current_node in forbidden_nodes:
+            continue
+
+        if current_node == target:
+            break  # Stop when reaching the target
+
+        for neighbor in graph[current_node]:
+            if neighbor in forbidden_nodes:  # Skip forbidden neighbors
+                continue
+
+            distance = current_distance + 1  # All edges have weight 1
+            if distance < distances[neighbor]:
+                distances[neighbor] = distance
+                previous_nodes[neighbor] = current_node
+                heappush(queue, (distance, neighbor))
+
+    # Reconstruct the path
+    path = []
+    current = target
+    while current is not None:
+        path.append(current)
+        current = previous_nodes[current]
+    path.reverse()
+
+    end_time = time.time()
+    print(f"Dijkstra's Algorithm Time: {end_time - start_time:.4f} seconds")
+    return path if path[0] == source else None
+
+def dijkstra_shortest_path_with_order(graph, source, target, ordered_nodes=None):
+    """
+    Solve the shortest path problem using Dijkstra's algorithm while ensuring specific nodes are visited in order.
+    
+    Parameters:
+        graph (dict): Adjacency list representation of the graph.
+        source (int): Source node.
+        target (int): Target node.
+        ordered_nodes (list): List of nodes to visit in the specified order.
+
+    Returns:
+        list: The shortest path from source to target passing through ordered_nodes in order, or None if no path exists.
+    """
+    if ordered_nodes is None:
+        ordered_nodes = []
+
+    # Include source and target in the ordered nodes list
+    full_path_nodes = [source] + ordered_nodes + [target]
+    full_path = []
+
+    # Solve subproblems for each segment in the ordered path
+    for i in range(len(full_path_nodes) - 1):
+        start, end = full_path_nodes[i], full_path_nodes[i + 1]
+        segment_path = dijkstra_single_path(graph, start, end)
+        if segment_path is None:
+            return None  # No valid path exists
+        # Combine paths, ensuring no duplication of intermediate nodes
+        if full_path:
+            full_path.extend(segment_path[1:])
+        else:
+            full_path.extend(segment_path)
+
+    return full_path
+
+def dijkstra_single_path(graph, source, target):
+    """
+    Solve the shortest path problem for a single source-target pair using Dijkstra's algorithm.
+    
+    Parameters:
+        graph (dict): Adjacency list representation of the graph.
+        source (int): Source node.
+        target (int): Target node.
+
+    Returns:
+        list: The shortest path from source to target, or None if no path exists.
+    """
+    start_time = time.time()
+
+    # Priority queue for Dijkstra's
+    queue = [(0, source)]  # (distance, node)
+    distances = {node: float('inf') for node in graph}
+    distances[source] = 0
+    previous_nodes = {node: None for node in graph}
+
+    while queue:
+        current_distance, current_node = heappop(queue)
+
+        if current_node == target:
+            break  # Stop when reaching the target
+
+        for neighbor in graph[current_node]:
+            distance = current_distance + 1  # All edges have weight 1
+            if distance < distances[neighbor]:
+                distances[neighbor] = distance
+                previous_nodes[neighbor] = current_node
+                heappush(queue, (distance, neighbor))
+
+    # Reconstruct the path
+    path = []
+    current = target
+    while current is not None:
+        path.append(current)
+        current = previous_nodes[current]
+    path.reverse()
+
+    end_time = time.time()
+    print(f"Dijkstra's Algorithm Time (single segment): {end_time - start_time:.4f} seconds")
+    return path if path[0] == source else None
+
+
+def print_graph(graph):
+    """Print a visual representation of the graph."""
+    print("\nGraph:")
+    for node, neighbors in graph.items():
+        print(f"Node {node}: Connected to {sorted(neighbors)}")
+
+# Main Execution
+num_nodes = 100
+graph, edges = generate_connected_graph(num_nodes)
+print_graph(graph)
+
+source, target = random.sample(range(num_nodes), 2)
+via_nodes = random.sample([n for n in range(num_nodes) if n not in {source, target}], random.randint(2, 4))
+print(f"\nNeed to pass by: {via_nodes}")
+print(f"\nSource: {source}, Target: {target}")
+
+# Solve with SAT
+start_SAT = time.time()
+path_sat = solve_shortest_path(graph, source, target, num_nodes, via_nodes)
+end_SAT = time.time()
+print(f"\nSAT Total Time: {end_SAT - start_SAT:.4f} seconds")
+if path_sat:
+    print("Shortest Path with SAT:", " -> ".join(map(str, path_sat)))
+else:
+    print("No path found with SAT.")
+
+# Solve with Dijkstra's Algorithm
+path_dijkstra = dijkstra_shortest_path(graph, source, target)
+
+# path_dijkstra = dijkstra_shortest_path_forbidden_nodes(graph, source, target, via_nodes)
+
+# path_dijkstra = dijkstra_shortest_path_with_order(graph, source, target, via_nodes)
+
+
+if path_dijkstra:
+    print("Shortest Path with Dijkstra's:", " -> ".join(map(str, path_dijkstra)))
+else:
+    print("No path found with Dijkstra's.")
+
+visualize_graph_with_paths(graph, path_dijkstra, path_sat, source, target, via_nodes)
