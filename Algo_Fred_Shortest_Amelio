@@ -212,142 +212,6 @@ def visualize_graph_with_paths(graph, path_dijkstra, path_sat, source, target, v
     plt.axis("off")
     plt.show()
 
-def dijkstra_shortest_path_forbidden_nodes(graph, source, target, forbidden_nodes=None):
-    """
-    Solve the shortest path problem using Dijkstra's algorithm while avoiding forbidden nodes.
-    
-    Parameters:
-        graph (dict): Adjacency list representation of the graph.
-        source (int): Source node.
-        target (int): Target node.
-        forbidden_nodes (list): List of nodes to avoid in the path.
-
-    Returns:
-        list: The shortest path from source to target, or None if no path exists.
-    """
-    if forbidden_nodes is None:
-        forbidden_nodes = []
-
-    start_time = time.time()
-
-    # Priority queue for Dijkstra's
-    queue = [(0, source)]  # (distance, node)
-    distances = {node: float('inf') for node in graph}
-    distances[source] = 0
-    previous_nodes = {node: None for node in graph}
-
-    while queue:
-        current_distance, current_node = heappop(queue)
-
-        # Skip forbidden nodes
-        if current_node in forbidden_nodes:
-            continue
-
-        if current_node == target:
-            break  # Stop when reaching the target
-
-        for neighbor in graph[current_node]:
-            if neighbor in forbidden_nodes:  # Skip forbidden neighbors
-                continue
-
-            distance = current_distance + 1  # All edges have weight 1
-            if distance < distances[neighbor]:
-                distances[neighbor] = distance
-                previous_nodes[neighbor] = current_node
-                heappush(queue, (distance, neighbor))
-
-    # Reconstruct the path
-    path = []
-    current = target
-    while current is not None:
-        path.append(current)
-        current = previous_nodes[current]
-    path.reverse()
-
-    end_time = time.time()
-    print(f"Dijkstra's Algorithm Time: {end_time - start_time:.4f} seconds")
-    return path if path[0] == source else None
-
-def dijkstra_shortest_path_with_order(graph, source, target, ordered_nodes=None):
-    """
-    Solve the shortest path problem using Dijkstra's algorithm while ensuring specific nodes are visited in order.
-    
-    Parameters:
-        graph (dict): Adjacency list representation of the graph.
-        source (int): Source node.
-        target (int): Target node.
-        ordered_nodes (list): List of nodes to visit in the specified order.
-
-    Returns:
-        list: The shortest path from source to target passing through ordered_nodes in order, or None if no path exists.
-    """
-    if ordered_nodes is None:
-        ordered_nodes = []
-
-    # Include source and target in the ordered nodes list
-    full_path_nodes = [source] + ordered_nodes + [target]
-    full_path = []
-
-    # Solve subproblems for each segment in the ordered path
-    for i in range(len(full_path_nodes) - 1):
-        start, end = full_path_nodes[i], full_path_nodes[i + 1]
-        segment_path = dijkstra_single_path(graph, start, end)
-        if segment_path is None:
-            return None  # No valid path exists
-        # Combine paths, ensuring no duplication of intermediate nodes
-        if full_path:
-            full_path.extend(segment_path[1:])
-        else:
-            full_path.extend(segment_path)
-
-    return full_path
-
-def dijkstra_single_path(graph, source, target):
-    """
-    Solve the shortest path problem for a single source-target pair using Dijkstra's algorithm.
-    
-    Parameters:
-        graph (dict): Adjacency list representation of the graph.
-        source (int): Source node.
-        target (int): Target node.
-
-    Returns:
-        list: The shortest path from source to target, or None if no path exists.
-    """
-    start_time = time.time()
-
-    # Priority queue for Dijkstra's
-    queue = [(0, source)]  # (distance, node)
-    distances = {node: float('inf') for node in graph}
-    distances[source] = 0
-    previous_nodes = {node: None for node in graph}
-
-    while queue:
-        current_distance, current_node = heappop(queue)
-
-        if current_node == target:
-            break  # Stop when reaching the target
-
-        for neighbor in graph[current_node]:
-            distance = current_distance + 1  # All edges have weight 1
-            if distance < distances[neighbor]:
-                distances[neighbor] = distance
-                previous_nodes[neighbor] = current_node
-                heappush(queue, (distance, neighbor))
-
-    # Reconstruct the path
-    path = []
-    current = target
-    while current is not None:
-        path.append(current)
-        current = previous_nodes[current]
-    path.reverse()
-
-    end_time = time.time()
-    print(f"Dijkstra's Algorithm Time (single segment): {end_time - start_time:.4f} seconds")
-    return path if path[0] == source else None
-
-
 def print_graph(graph):
     """Print a visual representation of the graph."""
     print("\nGraph:")
@@ -355,12 +219,17 @@ def print_graph(graph):
         print(f"Node {node}: Connected to {sorted(neighbors)}")
 
 # Main Execution
-num_nodes = 100
+num_nodes = 30
 graph, edges = generate_connected_graph(num_nodes)
 print_graph(graph)
 
 source, target = random.sample(range(num_nodes), 2)
+
+# Random via node for PATH
 via_nodes = random.sample([n for n in range(num_nodes) if n not in {source, target}], random.randint(2, 4))
+# Random via node for PATH HAMILTONNIEN
+# via_nodes = [n for n in range(num_nodes) if n != source and n != target]
+
 print(f"\nNeed to pass by: {via_nodes}")
 print(f"\nSource: {source}, Target: {target}")
 
@@ -376,10 +245,6 @@ else:
 
 # Solve with Dijkstra's Algorithm
 path_dijkstra = dijkstra_shortest_path(graph, source, target)
-
-# path_dijkstra = dijkstra_shortest_path_forbidden_nodes(graph, source, target, via_nodes)
-
-# path_dijkstra = dijkstra_shortest_path_with_order(graph, source, target, via_nodes)
 
 
 if path_dijkstra:

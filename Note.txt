@@ -13,6 +13,10 @@ Graph aléatoire :
 Keskonfé:
 - Pondérer les arrêtes ( même pas le pareil le papier, comparé )
 
+
+
 => Chercher des méthodes pour amélioré la rapidité
+
 => Transformer en PATH HAMILTONNIEN
-=> Cas d'utilisation d'un SAT et pas de dijkstra 
+
+=> Cas d'utilisation d'un SAT et pas de Dijkstra
