@@ -1,0 +1,90 @@
+import random
+import networkx as nx
+import matplotlib.pyplot as plt
+import time
+
+def generate_connected_graph(num_nodes):
+    """Generate a connected graph as an adjacency list."""
+    graph = {i: set() for i in range(num_nodes)}
+    edges = []
+
+    # Ensure the graph is connected by creating a spanning tree
+    nodes = list(range(num_nodes))
+    random.shuffle(nodes)
+    for i in range(num_nodes - 1):
+        u, v = nodes[i], nodes[i + 1]
+        graph[u].add(v)
+        graph[v].add(u)
+        edges.append((u, v))
+
+    # Add additional random edges
+    for _ in range(num_nodes):  # Adding a few random edges
+        u, v = random.sample(range(num_nodes), 2)
+        if v not in graph[u]:
+            graph[u].add(v)
+            graph[v].add(u)
+            edges.append((u, v))
+
+    return graph, edges
+
+def greedy_vertex_cover(graph, edges):
+    """Compute a Vertex Cover using a greedy approach."""
+    vertex_cover = set()
+    edge_set = set(edges)
+    covered_edges = []
+
+    while edge_set:
+        # Select the node with the highest degree
+        u = max(graph, key=lambda x: len(graph[x]))
+        
+        # Add the selected node to the vertex cover
+        vertex_cover.add(u)
+
+        # Remove all edges incident to the selected node
+        for v in list(graph[u]):
+            if (u, v) in edge_set or (v, u) in edge_set:
+                covered_edges.append((u, v))
+            edge_set.discard((u, v))
+            edge_set.discard((v, u))
+            graph[v].discard(u)
+        graph[u].clear()
+
+    return vertex_cover, covered_edges
+
+def plot_graph_with_vertex_cover(graph, edges, vertex_cover):
+    """Plot the graph and highlight the vertex cover."""
+    G = nx.Graph()
+    G.add_edges_from(edges)
+
+    pos = nx.spring_layout(G)
+
+    # Highlight the nodes in the vertex cover and their edges
+    edge_colors = ["blue" if (u in vertex_cover or v in vertex_cover) else "gray" for u, v in G.edges()]
+    node_colors = ["red" if node in vertex_cover else "gray" for node in G.nodes()]
+
+    plt.figure(figsize=(10, 8))
+    nx.draw(G, pos, with_labels=True, node_color=node_colors, edge_color=edge_colors, node_size=800, font_size=10, width=2)
+    plt.title("Graph with Vertex Cover Highlighted")
+    plt.show()
+
+# Example usage
+num_nodes = 1000
+graph, edges = generate_connected_graph(num_nodes)
+print("Graph (Adjacency List):", graph)
+print("Edges:", edges)
+
+start_time = time.time()
+vertex_cover, covered_edges = greedy_vertex_cover(graph, edges)
+end_time = time.time()
+
+print("Vertex Cover:", vertex_cover)
+print("Covered Edges:", covered_edges)
+print(f"Time taken for greedy_vertex_cover: {end_time - start_time:.6f} seconds")
+
+# Verify all edges are covered
+all_edges = set(edges)
+covered_edges_set = set(covered_edges)
+print("All edges covered:", all_edges == covered_edges_set)
+
+# Plot the graph with the vertex cover
+plot_graph_with_vertex_cover(graph, edges, vertex_cover)
